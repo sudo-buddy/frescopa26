@@ -17,20 +17,10 @@ export function hasExperiments(doc) {
 let enabled = false;
 let authoring = false;
 
-const blockLegacyAuthorMessages = (event) => {
-  const type = event.data?.type;
-  if (typeof type === 'string'
-    && (type.startsWith('hlx:experimentation-') || type === 'hlx:last-modified-request')) {
-    // DA uses the scoped preview bridge, not the engine's unrestricted simulation handshake.
-    event.stopImmediatePropagation();
-  }
-};
-
 export async function runExperimentation(doc, options) {
   authoring = isAuthorPreview(window.location.href, window.parent !== window);
   enabled = authoring || hasExperiments(doc);
   if (!enabled) return false;
-  if (authoring) window.addEventListener('message', blockLegacyAuthorMessages, true);
   try {
     const { loadEager } = await import('../plugins/experimentation/src/index.js');
     await loadEager(doc, options);

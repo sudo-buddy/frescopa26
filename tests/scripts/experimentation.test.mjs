@@ -62,7 +62,7 @@ test('ordinary pages skip both phases and eager failures leave page rendering av
   assert.equal(await runExperimentationLazy(doc, {}), false);
 });
 
-test('empty DA canvas pages initialize the real engine but block its legacy wildcard handshake', async (t) => {
+test('empty DA canvas pages initialize the real engine without a separate simulation UI', async (t) => {
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
   t.after(() => {
@@ -90,13 +90,6 @@ test('empty DA canvas pages initialize the real engine but block its legacy wild
   assert.equal(win.hlx.experimentation.version, '2.0.0');
   assert.deepEqual(win.hlx.experiments, []);
   assert.equal(await runExperimentationLazy(doc, options), true);
-  const guard = win.addEventListener.mock.calls.find(({ arguments: args }) => args[2] === true)
-    .arguments[1];
-  const stop = t.mock.fn();
-  guard({ data: { type: 'hlx:experimentation-get-config' }, stopImmediatePropagation: stop });
-  assert.equal(stop.mock.callCount(), 1);
-  guard({ data: { type: 'da:contextual-experimentation' }, stopImmediatePropagation: stop });
-  assert.equal(stop.mock.callCount(), 1);
 });
 
 test('DA context resolves the actual code branch and keeps navigation inside this site', () => {
@@ -251,13 +244,20 @@ test('preview transport works without enumerated frames and isolates pages and t
     location: new URL(`${page.origin}/index?controller=parent&quick-edit=on`),
     parent: { frames: { length: 0 } },
     sessionStorage: storage(),
-    addEventListener: () => {},
-    removeEventListener: () => {},
+    addEventListener: t.mock.fn(),
+    removeEventListener: t.mock.fn(),
     hlx: { experimentation: { version: '2.0.0' }, experiments: [], unrelated: 'not-for-panel' },
   };
   globalThis.window = win;
   globalThis.document = { querySelectorAll: () => [marker] };
   disconnect = connectAuthorPreview({ prodHost: 'www.example.com' });
+  const guard = win.addEventListener.mock.calls.find(({ arguments: args }) => args[2] === true)
+    .arguments[1];
+  const stop = t.mock.fn();
+  guard({ data: { type: 'hlx:experimentation-get-config' }, stopImmediatePropagation: stop });
+  assert.equal(stop.mock.callCount(), 1);
+  guard({ data: { type: BRIDGE_MESSAGE }, stopImmediatePropagation: stop });
+  assert.equal(stop.mock.callCount(), 1);
   const client = createPreviewChannel(`${page.origin}/`);
   const otherPage = createPreviewChannel(`${page.origin}/other`);
   const currentStorage = win.sessionStorage;
@@ -291,6 +291,9 @@ test('preview transport works without enumerated frames and isolates pages and t
   assert.deepEqual(outline, { value: '1px dotted red', priority: 'important' });
   await request('highlight', { selector: '.experiment-check' });
   disconnect();
+  assert.ok(win.removeEventListener.mock.calls.some(({ arguments: args }) => (
+    args[0] === 'message' && args[1] === guard && args[2] === true
+  )));
   assert.deepEqual(outline, { value: '1px dotted red', priority: 'important' });
   await new Promise((resolve) => { setTimeout(resolve, 25); });
   assert.equal(leakedMessages, 0);

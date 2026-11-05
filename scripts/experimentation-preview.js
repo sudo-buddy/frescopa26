@@ -12,6 +12,15 @@ export function getExperimentConfig(namespace, prodHost) {
 
 export default function connectAuthorPreview({ prodHost }) {
   const channel = createPreviewChannel(window.location.href);
+  const blockLegacyAuthorMessages = (event) => {
+    const type = event.data?.type;
+    if (typeof type === 'string'
+      && (type.startsWith('hlx:experimentation-') || type === 'hlx:last-modified-request')) {
+      // This DA panel uses the scoped channel, not the legacy simulation handshake.
+      event.stopImmediatePropagation();
+    }
+  };
+  window.addEventListener('message', blockLegacyAuthorMessages, true);
   const highlights = new Map();
   const clearHighlight = () => {
     highlights.forEach(({ value, priority }, element) => {
@@ -57,6 +66,7 @@ export default function connectAuthorPreview({ prodHost }) {
   const disconnect = () => {
     channel.close();
     window.removeEventListener('pagehide', disconnect);
+    window.removeEventListener('message', blockLegacyAuthorMessages, true);
     clearHighlight();
   };
   window.addEventListener('pagehide', disconnect, { once: true });
