@@ -65,6 +65,12 @@ pages appear, including any indexed templates or demos.
 
 ## Experimentation
 
+For step-by-step setup and configuration, see the
+[Contextual Experimentation with DA and Experience Workspace wiki](https://github.com/sudo-buddy/frescopa26/wiki/Contextual-Experimentation-with-DA-and-Experience-Workspace).
+The UI adapter is the same integration proposed in
+[markszulc/frescopa26#47](https://github.com/markszulc/frescopa26/pull/47);
+this fork retains its own working demo configuration and runtime loading.
+
 ### Demo prerequisites
 
 This repository runs as a **non-commerce, English-only DA experimentation demo**.
