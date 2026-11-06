@@ -7,7 +7,9 @@ import {
   runExperimentationLazy,
 } from '../../scripts/experiment-loader.js';
 import connectAuthorPreview, { getExperimentConfig } from '../../scripts/experimentation-preview.js';
-import createPreviewChannel, { BRIDGE_MESSAGE } from '../../scripts/experimentation-channel.js';
+import createPreviewChannel, {
+  BRIDGE_MESSAGE, requestPreviewAction,
+} from '../../scripts/experimentation-channel.js';
 import {
   MFE_ORIGIN,
   getPageContext,
@@ -15,7 +17,35 @@ import {
   getMfeUrl,
   isMfeMessage,
   rememberImsOrganization,
+  setupExperimentationConnection,
 } from '../../tools/plugins/contextual-experimentation/context.js';
+
+function connectionElements(value) {
+  const formEvents = new Map();
+  const changeEvents = new Map();
+  const input = { value, focus() { this.focused = true; } };
+  const form = {
+    hidden: false,
+    querySelector: () => input,
+    addEventListener: (name, handler) => formEvents.set(name, handler),
+  };
+  const frame = { hidden: true, removeAttribute(name) { delete this[name]; } };
+  const button = { disabled: true };
+  const changeButton = {
+    hidden: true,
+    addEventListener: (name, handler) => changeEvents.set(name, handler),
+  };
+  return {
+    form,
+    frame,
+    button,
+    changeButton,
+    status: {},
+    input,
+    submit: () => formEvents.get('submit')({ preventDefault() {} }),
+    change: () => changeEvents.get('click')(),
+  };
+}
 
 const page = getPageContext({
   org: 'sudo-buddy', repo: 'frescopa26', branch: 'main', path: '/index',
@@ -182,6 +212,113 @@ test('blocked or full browser storage does not prevent organization form submiss
   const fullStorage = { value: '123ABC@AdobeOrg', form: new EventTarget() };
   assert.doesNotThrow(() => rememberImsOrganization(fullStorage));
   assert.doesNotThrow(() => fullStorage.form.dispatchEvent(new Event('submit')));
+});
+
+test('remembered organization opens CE with the DA token once and can be changed', async (t) => {
+  const ui = connectionElements('123ABC@AdobeOrg');
+  let ready;
+  const config = new Promise((resolve) => { ready = resolve; });
+  const requestConfig = t.mock.fn(() => config);
+  const createMfeUrl = t.mock.fn((imsOrg) => getMfeUrl({
+    pageUrl: page.pageUrl, origin: page.origin, token: 'fresh-test-token', imsOrg,
+  }));
+  const opening = setupExperimentationConnection({ ...ui, requestConfig, createMfeUrl });
+  assert.equal(ui.button.disabled, true);
+  assert.equal(ui.form.hidden, true);
+  await ui.submit();
+  assert.equal(requestConfig.mock.callCount(), 1);
+  ready();
+  await opening;
+  assert.equal(new URL(ui.frame.src).origin, MFE_ORIGIN);
+  assert.equal(ui.form.hidden, true);
+  assert.equal(ui.frame.hidden, false);
+  assert.equal(ui.changeButton.hidden, false);
+
+  ui.change();
+  assert.equal(ui.form.hidden, false);
+  assert.equal(ui.frame.hidden, true);
+  assert.equal(ui.frame.src, undefined);
+  assert.equal(ui.input.focused, true);
+  ui.input.value = ' 456DEF@AdobeOrg ';
+  await ui.submit();
+  assert.deepEqual(createMfeUrl.mock.calls.map(({ arguments: args }) => args[0]), [
+    '123ABC@AdobeOrg', '456DEF@AdobeOrg',
+  ]);
+  assert.equal(ui.frame.hidden, false);
+});
+
+test('missing or invalid organization keeps first-use setup available', async (t) => {
+  await Promise.all(['', 'invalid'].map(async (value) => {
+    const ui = connectionElements(value);
+    const requestConfig = t.mock.fn(async () => {});
+    await setupExperimentationConnection({
+      ...ui, requestConfig, createMfeUrl: () => `${MFE_ORIGIN}/test`,
+    });
+    assert.equal(requestConfig.mock.callCount(), 0);
+    assert.equal(ui.form.hidden, false);
+    assert.equal(ui.button.disabled, false);
+    ui.input.value = '123ABC@AdobeOrg';
+    await ui.submit();
+    assert.equal(requestConfig.mock.callCount(), 1);
+    assert.equal(ui.form.hidden, true);
+  }));
+});
+
+test('automatic connection failure returns to the form for manual retry', async (t) => {
+  const ui = connectionElements('123ABC@AdobeOrg');
+  let failed = false;
+  const requestConfig = t.mock.fn(async () => {
+    if (!failed) {
+      failed = true;
+      throw new Error('Preview is unavailable');
+    }
+  });
+  await setupExperimentationConnection({
+    ...ui, requestConfig, createMfeUrl: () => `${MFE_ORIGIN}/test`,
+  });
+  assert.equal(ui.status.textContent, 'Preview is unavailable');
+  assert.equal(ui.form.hidden, false);
+  assert.equal(ui.button.disabled, false);
+  assert.equal(ui.frame.hidden, true);
+  assert.equal(ui.changeButton.hidden, true);
+  await ui.submit();
+  assert.equal(ui.form.hidden, true);
+  assert.equal(ui.status.hidden, true);
+});
+
+test('configuration request waits for a late preview and stops retrying after its reply', async (t) => {
+  const name = `late-preview-${crypto.randomUUID()}`;
+  const client = new BroadcastChannel(name);
+  const pending = new Map();
+  let preview;
+  const start = setTimeout(() => {
+    preview = new BroadcastChannel(name);
+    preview.onmessage = ({ data }) => preview.postMessage({
+      type: BRIDGE_MESSAGE, response: true, requestId: data.requestId, result: 'ready',
+    });
+  }, 20);
+  t.after(() => {
+    clearTimeout(start);
+    pending.forEach((cancel) => cancel());
+    client.close();
+    preview?.close();
+  });
+  const sends = t.mock.method(client, 'postMessage');
+  assert.equal(await requestPreviewAction(client, pending, 'config'), 'ready');
+  assert.ok(sends.mock.callCount() >= 2);
+  assert.equal(pending.size, 0);
+  const count = sends.mock.callCount();
+  await new Promise((resolve) => { setTimeout(resolve, 550); });
+  assert.equal(sends.mock.callCount(), count);
+});
+
+test('closing the panel cancels an outstanding preview action', async (t) => {
+  const channel = Object.assign(new EventTarget(), { postMessage: t.mock.fn() });
+  const pending = new Map();
+  const response = requestPreviewAction(channel, pending, 'highlight', { selector: '.hero' });
+  pending.values().next().value();
+  await assert.rejects(response, /panel was closed/);
+  assert.equal(pending.size, 0);
 });
 
 test('MFE messages require both the production origin and the actual iframe window', () => {

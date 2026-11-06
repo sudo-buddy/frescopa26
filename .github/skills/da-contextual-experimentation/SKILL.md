@@ -101,8 +101,10 @@ Keep tokens out of query strings, storage, logs, screenshots of developer
 tools, and repository artifacts.
 
 The connection form remembers only valid submitted organization IDs under
-`da:contextual-experimentation:ims-org` in origin-scoped localStorage. Prefill
-the form; do not automatically connect or activate anything. A new valid
+`da:contextual-experimentation:ims-org` in origin-scoped localStorage. Once the DA
+SDK supplies the current session token, automatically connect with a valid saved
+organization; never automatically activate an experiment. Keep first-use and
+error fallback forms, and a **Change Adobe organization** control. A new valid
 submission replaces the value. Invalid input or blocked/full storage must not
 prevent manual entry. Main and feature branches have separate storage origins,
 so users enter the ID once on each origin/browser.
@@ -130,7 +132,8 @@ Validate in real DA, not only in a mock with ordinary DOM iframes:
 1. Confirm the expected code branch, genuine runtime version/configuration, and
    successful preview-channel reply.
 2. Submit an authorized organization, confirm the MFE renders, then reload or
-   reopen the panel and verify prefill without re-entry. Never print the token.
+   reopen the panel and verify automatic opening without another connection
+   click. Check organization switching and error recovery. Never print the token.
 3. Check actual backend HTTP statuses, not fabricated empty results.
 
 After the MFE loads, unrestricted accessibility snapshots can expose its
@@ -186,7 +189,7 @@ browser UI, backend access, and analytics validation.
 Use `gh pr checks` to inspect actual Code Sync/performance results. After a
 human merges, verify main serves the tested assets and point users to the
 normal main canvas URL without the feature `ref`. Remind them that organization
-prefill on main requires its own first submission.
+automatic opening on main requires its own first organization submission.
 
 Do not auto-merge, publish real content, or activate a production experiment
 without authorization. Finish with verified outcomes and explicit remaining
