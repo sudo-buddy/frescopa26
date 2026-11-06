@@ -7,6 +7,7 @@ import {
   getPageContext,
   getEditorHash,
   getMfeUrl,
+  getSessionOrganization,
   isMfeMessage,
   rememberImsOrganization,
   setupExperimentationConnection,
@@ -85,6 +86,7 @@ async function init() {
     requestConfig: async () => {
       latestConfig = await requestPreview('config');
     },
+    resolveOrganization: () => getSessionOrganization(host.token),
     createMfeUrl: (imsOrg) => getMfeUrl({
       pageUrl: page.pageUrl,
       origin: window.location.origin,

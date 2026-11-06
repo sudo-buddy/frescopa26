@@ -15,6 +15,7 @@ import {
   getPageContext,
   getEditorHash,
   getMfeUrl,
+  getSessionOrganization,
   isMfeMessage,
   rememberImsOrganization,
   setupExperimentationConnection,
@@ -262,6 +263,60 @@ test('missing or invalid organization keeps first-use setup available', async (t
     assert.equal(requestConfig.mock.callCount(), 1);
     assert.equal(ui.form.hidden, true);
   }));
+});
+
+test('first use opens CE with the DA session organization and keeps an explicit saved choice', async (t) => {
+  const ui = connectionElements('');
+  const requestConfig = t.mock.fn(async () => {});
+  const createMfeUrl = t.mock.fn(() => `${MFE_ORIGIN}/test`);
+  const resolveOrganization = t.mock.fn(async () => '789GHI@AdobeOrg');
+  await setupExperimentationConnection({
+    ...ui, requestConfig, createMfeUrl, resolveOrganization,
+  });
+  assert.deepEqual(createMfeUrl.mock.calls[0].arguments, ['789GHI@AdobeOrg']);
+  assert.equal(ui.form.hidden, true);
+  assert.equal(ui.frame.hidden, false);
+
+  const saved = connectionElements('123ABC@AdobeOrg');
+  const unused = t.mock.fn(async () => '789GHI@AdobeOrg');
+  await setupExperimentationConnection({
+    ...saved, requestConfig, createMfeUrl, resolveOrganization: unused,
+  });
+  assert.equal(unused.mock.callCount(), 0);
+  assert.equal(createMfeUrl.mock.calls[1].arguments[0], '123ABC@AdobeOrg');
+
+  const undetected = connectionElements('');
+  undetected.status.textContent = 'Page: test';
+  await setupExperimentationConnection({
+    ...undetected,
+    requestConfig,
+    createMfeUrl,
+    resolveOrganization: async () => { throw new Error('IMS unavailable'); },
+  });
+  assert.equal(undetected.form.hidden, false);
+  assert.equal(undetected.status.textContent, 'Page: test');
+});
+
+test('session organization uses the DA token client and ignores unusable IMS responses', async (t) => {
+  const claims = btoa(JSON.stringify({ client_id: 'darkalley' })).replace(/=+$/, '');
+  const token = `header.${claims}.signature`;
+  const fetchImpl = t.mock.fn(async () => ({
+    ok: true,
+    json: async () => [{ orgRef: { ident: 'bad id', authSrc: 'AdobeOrg' } },
+      { orgRef: { ident: '789GHI', authSrc: 'AdobeOrg' } }],
+  }));
+  assert.equal(await getSessionOrganization(token, fetchImpl), '789GHI@AdobeOrg');
+  const [url, options] = fetchImpl.mock.calls[0].arguments;
+  assert.equal(url.origin, 'https://ims-na1.adobelogin.com');
+  assert.equal(url.searchParams.get('client_id'), 'darkalley');
+  assert.equal(options.headers.Authorization, `Bearer ${token}`);
+
+  assert.equal(await getSessionOrganization('not-a-jwt', fetchImpl), null);
+  assert.equal(fetchImpl.mock.callCount(), 1);
+  assert.equal(await getSessionOrganization(token, async () => ({ ok: false })), null);
+  assert.equal(await getSessionOrganization(token, async () => { throw new Error('offline'); }), null);
+  const emptyJson = async () => ({ ok: true, json: async () => ({}) });
+  assert.equal(await getSessionOrganization(token, emptyJson), null);
 });
 
 test('automatic connection failure returns to the form for manual retry', async (t) => {

@@ -21,8 +21,40 @@ export function rememberImsOrganization(input) {
   });
 }
 
+const IMS_ORGANIZATIONS_URL = 'https://ims-na1.adobelogin.com/ims/organizations/v5';
+
+function getTokenClientId(token) {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const { client_id: clientId } = JSON.parse(atob(payload));
+    return typeof clientId === 'string' && /^[\w.-]+$/.test(clientId) ? clientId : null;
+  } catch {
+    return null;
+  }
+}
+
+// Mirrors DA's profile menu: the first organization of the signed-in IMS profile.
+export async function getSessionOrganization(token, fetchImpl = fetch) {
+  const clientId = typeof token === 'string' && getTokenClientId(token);
+  if (!clientId) return null;
+  try {
+    const url = new URL(IMS_ORGANIZATIONS_URL);
+    url.searchParams.set('client_id', clientId);
+    const response = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) return null;
+    const organizations = await response.json();
+    if (!Array.isArray(organizations)) return null;
+    return organizations
+      .map(({ orgRef } = {}) => `${orgRef?.ident}@${orgRef?.authSrc}`)
+      .find((id) => IMS_ORG_PATTERN.test(id)) || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function setupExperimentationConnection({
   form, frame, status, button, changeButton, requestConfig, createMfeUrl,
+  resolveOrganization = async () => null,
 }) {
   const input = form.querySelector('[name="imsOrg"]');
   let connecting = false;
@@ -65,6 +97,14 @@ export async function setupExperimentationConnection({
     status.hidden = true;
     input.focus();
   });
+  if (!IMS_ORG_PATTERN.test(input.value.trim())) {
+    const pageStatus = status.textContent;
+    status.hidden = false;
+    status.textContent = 'Finding your Adobe organization...';
+    const organization = await resolveOrganization().catch(() => null);
+    if (IMS_ORG_PATTERN.test(organization)) input.value = organization;
+    status.textContent = pageStatus;
+  }
   button.disabled = false;
   if (IMS_ORG_PATTERN.test(input.value.trim())) {
     form.hidden = true;

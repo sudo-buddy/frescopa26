@@ -100,14 +100,16 @@ page URL, IMS organization, token, production environment, and UI preferences.
 Keep tokens out of query strings, storage, logs, screenshots of developer
 tools, and repository artifacts.
 
-The connection form remembers only valid submitted organization IDs under
-`da:contextual-experimentation:ims-org` in origin-scoped localStorage. Once the DA
-SDK supplies the current session token, automatically connect with a valid saved
-organization; never automatically activate an experiment. Keep first-use and
-error fallback forms, and a **Change Adobe organization** control. A new valid
-submission replaces the value. Invalid input or blocked/full storage must not
-prevent manual entry. Main and feature branches have separate storage origins,
-so users enter the ID once on each origin/browser.
+Once the DA SDK supplies the current session token, connect automatically. Use a
+valid organization the user explicitly submitted (saved under
+`da:contextual-experimentation:ims-org` in origin-scoped localStorage); otherwise
+resolve the session's organization from
+`https://ims-na1.adobelogin.com/ims/organizations/v5?client_id={token client_id}`
+(the first valid `orgRef.ident@orgRef.authSrc`, as DA's profile menu does). Do not
+use DA's repository owner (`context.org`) as an IMS organization. Never
+automatically activate an experiment. Keep the form as a fallback when detection
+or connection fails, and a **Change Adobe organization** control. Invalid input
+or blocked/full storage must not prevent manual entry.
 
 Accept MFE messages only from both its exact production origin and actual
 iframe window. Support genuine configuration requests, validated same-site
@@ -131,9 +133,9 @@ Validate in real DA, not only in a mock with ordinary DOM iframes:
 
 1. Confirm the expected code branch, genuine runtime version/configuration, and
    successful preview-channel reply.
-2. Submit an authorized organization, confirm the MFE renders, then reload or
-   reopen the panel and verify automatic opening without another connection
-   click. Check organization switching and error recovery. Never print the token.
+2. With no saved organization, open the panel and confirm the MFE renders for
+   the DA session's organization without any form or connection click; reload
+   and confirm again. Check organization switching and error recovery. Never print the token.
 3. Check actual backend HTTP statuses, not fabricated empty results.
 
 After the MFE loads, unrestricted accessibility snapshots can expose its
@@ -188,8 +190,8 @@ browser UI, backend access, and analytics validation.
 
 Use `gh pr checks` to inspect actual Code Sync/performance results. After a
 human merges, verify main serves the tested assets and point users to the
-normal main canvas URL without the feature `ref`. Remind them that organization
-automatic opening on main requires its own first organization submission.
+normal main canvas URL without the feature `ref`. Automatic opening on main uses
+the DA session organization; no per-origin first submission is needed.
 
 Do not auto-merge, publish real content, or activate a production experiment
 without authorization. Finish with verified outcomes and explicit remaining

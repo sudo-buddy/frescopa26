@@ -140,18 +140,18 @@ and connect your consent manager using the upstream engine's consent API.
 The adapter at
 `/tools/plugins/contextual-experimentation/contextual-experimentation.html`
 loads the production Contextual Experimentation MFE. It supplies the current
-DA page, the DA session's IMS token, and the authorized Adobe IMS organization ID
-entered in the panel. Tokens are held only in memory and passed in the MFE URL
+DA page, the DA session's IMS token, and the Adobe IMS organization of that
+session. Tokens are held only in memory and passed in the MFE URL
 fragment, not query strings or browser storage. Never paste tokens into site
 configuration or source files.
 
-Valid organization IDs are saved to origin-scoped browser localStorage when
-the form is submitted. On later opens, the panel uses the saved organization
-and your current DA session to open CE automatically, without a second sign-in
-or connection click. Use **Change Adobe organization** to return to the form.
-First use, missing/invalid saved IDs, and connection failures keep manual setup
-available. Each branch has its own origin, so enter the ID once per branch/browser.
-If storage is unavailable, manual entry still works. Configuration requests retry
+When no organization has been chosen explicitly, the panel asks Adobe IMS for
+the organization of the signed-in DA session (the same organization DA shows in
+its profile menu) and opens CE automatically, with no form, sign-in, or
+connection click. Use **Change Adobe organization** to choose another one;
+valid submitted IDs are saved to origin-scoped localStorage and take precedence
+afterwards. The form appears only when the session organization cannot be
+detected or the connection fails. If storage is unavailable, manual entry still works. Configuration requests retry
 briefly while the preview starts; no experiment is automatically activated.
 
 After deploying this code branch, add a row to the site's DA `library` sheet
