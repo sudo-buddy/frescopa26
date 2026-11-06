@@ -14,7 +14,7 @@
       <p>Connect the production experimentation UI to this DA page.</p>
       <label for="ims-org">Adobe IMS organization ID</label>
       <input id="ims-org" name="imsOrg" placeholder="Organization ID ending in @AdobeOrg" required>
-      <p>Experimentation opens with the Adobe organization of your DA session. Enter an organization here only if it could not be detected or you need a different one. It must be authorized for contextual experimentation. The organization ID is saved in this browser for this site. IMS tokens remain in memory and are sent only to Adobe IMS and Adobe's production MFE.</p>
+      <p>This must be an organization authorized for contextual experimentation. The organization ID is saved in this browser for this site and used to open experimentation automatically with your DA session. IMS tokens remain in memory and are sent only to Adobe's production MFE.</p>
       <button type="submit" disabled>Open experimentation</button>
     </form>
     <button id="change-organization" type="button" hidden>Change Adobe organization</button>
