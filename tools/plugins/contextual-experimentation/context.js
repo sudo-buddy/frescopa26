@@ -21,6 +21,59 @@ export function rememberImsOrganization(input) {
   });
 }
 
+export async function setupExperimentationConnection({
+  form, frame, status, button, changeButton, requestConfig, createMfeUrl,
+}) {
+  const input = form.querySelector('[name="imsOrg"]');
+  let connecting = false;
+  const connect = async () => {
+    if (connecting) return;
+    connecting = true;
+    button.disabled = true;
+    changeButton.disabled = true;
+    status.hidden = false;
+    status.textContent = 'Connecting to the canvas runtime...';
+    try {
+      await requestConfig();
+      frame.src = createMfeUrl(input.value.trim());
+      form.hidden = true;
+      status.hidden = true;
+      frame.hidden = false;
+      changeButton.hidden = false;
+    } catch (error) {
+      form.hidden = false;
+      frame.hidden = true;
+      frame.removeAttribute('src');
+      changeButton.hidden = true;
+      status.hidden = false;
+      status.textContent = error.message || 'The experimentation connection failed.';
+    } finally {
+      connecting = false;
+      button.disabled = false;
+      changeButton.disabled = false;
+    }
+  };
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await connect();
+  });
+  changeButton.addEventListener('click', () => {
+    frame.hidden = true;
+    frame.removeAttribute('src');
+    form.hidden = false;
+    changeButton.hidden = true;
+    status.hidden = true;
+    input.focus();
+  });
+  button.disabled = false;
+  if (IMS_ORG_PATTERN.test(input.value.trim())) {
+    form.hidden = true;
+    await connect();
+  } else {
+    form.hidden = false;
+  }
+}
+
 export function getPageContext(context) {
   const {
     org, repo, site = repo, branch, path = '/',

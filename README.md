@@ -146,9 +146,13 @@ fragment, not query strings or browser storage. Never paste tokens into site
 configuration or source files.
 
 Valid organization IDs are saved to origin-scoped browser localStorage when
-the form is submitted and prefilled when the panel is reopened. Enter a new ID
-and submit to replace it. Each code branch has its own origin, so enter the ID
-once per branch/browser. If storage is unavailable, manual entry still works.
+the form is submitted. On later opens, the panel uses the saved organization
+and your current DA session to open CE automatically, without a second sign-in
+or connection click. Use **Change Adobe organization** to return to the form.
+First use, missing/invalid saved IDs, and connection failures keep manual setup
+available. Each branch has its own origin, so enter the ID once per branch/browser.
+If storage is unavailable, manual entry still works. Configuration requests retry
+briefly while the preview starts; no experiment is automatically activated.
 
 After deploying this code branch, add a row to the site's DA `library` sheet
 at <https://da.live/config#/sudo-buddy/frescopa26>, preserving existing rows:
