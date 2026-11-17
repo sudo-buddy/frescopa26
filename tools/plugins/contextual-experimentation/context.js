@@ -21,6 +21,56 @@ export function rememberImsOrganization(input) {
   });
 }
 
+export async function setupExperimentationConnection({
+  form, status, button, changeButton, requestConfig, createMfeUrl, showFrame, hideFrame,
+}) {
+  const input = form.querySelector('[name="imsOrg"]');
+  let connecting = false;
+  const connect = async () => {
+    if (connecting) return;
+    connecting = true;
+    button.disabled = true;
+    changeButton.disabled = true;
+    status.hidden = false;
+    status.textContent = 'Connecting to the canvas runtime...';
+    try {
+      await requestConfig();
+      showFrame(createMfeUrl(input.value.trim()));
+      form.hidden = true;
+      status.hidden = true;
+      changeButton.hidden = false;
+    } catch (error) {
+      form.hidden = false;
+      hideFrame();
+      changeButton.hidden = true;
+      status.hidden = false;
+      status.textContent = error.message || 'The experimentation connection failed.';
+    } finally {
+      connecting = false;
+      button.disabled = false;
+      changeButton.disabled = false;
+    }
+  };
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await connect();
+  });
+  changeButton.addEventListener('click', () => {
+    hideFrame();
+    form.hidden = false;
+    changeButton.hidden = true;
+    status.hidden = true;
+    input.focus();
+  });
+  button.disabled = false;
+  if (IMS_ORG_PATTERN.test(input.value.trim())) {
+    form.hidden = true;
+    await connect();
+  } else {
+    form.hidden = false;
+  }
+}
+
 export function getPageContext(context) {
   const {
     org, repo, site = repo, branch, path = '/',
@@ -47,8 +97,26 @@ export function getEditorHash(href, context) {
   return `/${context.org}/${context.site}/${path}`;
 }
 
+const BACKEND_ENVS = ['prod', 'stage', 'dev', 'qa', 'local'];
+const BACKEND_VERSION_PATTERN = /^[a-z0-9][a-z0-9.-]*$/i;
+
+/**
+ * Reads the App Builder backend selection from the plugin URL query string,
+ * mirroring the UE extension loader (`?env=local&backendVersion=...`).
+ * `env=local` makes the production MFE call https://localhost:9080.
+ */
+export function getBackendOptions(search = '') {
+  const params = new URLSearchParams(search);
+  const env = params.get('env');
+  const backendVersion = params.get('backendVersion');
+  return {
+    env: BACKEND_ENVS.includes(env) ? env : 'prod',
+    ...(BACKEND_VERSION_PATTERN.test(backendVersion ?? '') && { backendVersion }),
+  };
+}
+
 export function getMfeUrl({
-  pageUrl, origin, token, imsOrg,
+  pageUrl, origin, token, imsOrg, env = 'prod', backendVersion,
 }) {
   if (!token || !IMS_ORG_PATTERN.test(imsOrg)) {
     throw new Error('Sign in to DA and supply a valid Adobe IMS organization ID.');
@@ -59,7 +127,8 @@ export function getMfeUrl({
   );
   const data = {
     triggerSource: 'ue',
-    env: 'prod',
+    env,
+    ...(backendVersion && { backendVersion }),
     origin,
     pageUrl,
     imsToken: token,

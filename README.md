@@ -146,9 +146,13 @@ fragment, not query strings or browser storage. Never paste tokens into site
 configuration or source files.
 
 Valid organization IDs are saved to origin-scoped browser localStorage when
-the form is submitted and prefilled when the panel is reopened. Enter a new ID
-and submit to replace it. Each code branch has its own origin, so enter the ID
-once per branch/browser. If storage is unavailable, manual entry still works.
+the form is submitted. On later opens, the panel uses the saved organization
+and your current DA session to open CE automatically, without a second sign-in
+or connection click. Use **Change Adobe organization** to return to the form.
+First use, missing/invalid saved IDs, and connection failures keep manual setup
+available. Each branch has its own origin, so enter the ID once per branch/browser.
+If storage is unavailable, manual entry still works. Configuration requests retry
+briefly while the preview starts; no experiment is automatically activated.
 
 After deploying this code branch, add a row to the site's DA `library` sheet
 at <https://da.live/config#/sudo-buddy/frescopa26>, preserving existing rows:
@@ -166,6 +170,13 @@ requires the deployed plugin and preview to share an origin; use a feature
 branch deployed to AEM for end-to-end testing, rather than `ref=local`.
 Open `https://da.live/canvas?ref={branch}#/sudo-buddy/frescopa26/index`
 to load both the canvas and the registered plugin from that code branch.
+
+To point the MFE at a local App Builder backend (`aio app dev` on
+`https://localhost:9080`), add `?env=local` to the plugin path, for example
+`/tools/plugins/contextual-experimentation/contextual-experimentation.html?env=local`
+in a separate library row. The plugin also accepts `env=stage|qa|dev` and
+`backendVersion`, like the Universal Editor extension loader. Trust the local
+server's certificate by opening `https://localhost:9080/` once in the browser.
 
 The adapter relays actual engine configuration, same-site variant navigation,
 and experiment hover highlighting. DA's currently available host protocol does

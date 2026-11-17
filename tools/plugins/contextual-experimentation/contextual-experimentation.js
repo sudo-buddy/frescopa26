@@ -1,25 +1,29 @@
 import createPreviewChannel, {
   BRIDGE_MESSAGE,
+  requestPreviewAction,
 } from '../../../scripts/experimentation-channel.js';
 import {
   MFE_ORIGIN,
+  getBackendOptions,
   getPageContext,
   getEditorHash,
   getMfeUrl,
   isMfeMessage,
   rememberImsOrganization,
+  setupExperimentationConnection,
 } from './context.js';
 
 const form = document.querySelector('#connect');
-const frame = document.querySelector('#experimentation');
 const status = document.querySelector('#status');
 const button = form.querySelector('button');
+const changeButton = document.querySelector('#change-organization');
 const pending = new Map();
 rememberImsOrganization(form.querySelector('[name="imsOrg"]'));
 let page;
 let actions;
 let latestConfig;
 let channel;
+let frame;
 
 function showError(error) {
   status.hidden = false;
@@ -27,37 +31,41 @@ function showError(error) {
 }
 
 function requestPreview(action, details = {}) {
-  return new Promise((resolve, reject) => {
-    const requestId = crypto.randomUUID();
-    const timer = setTimeout(() => {
-      pending.delete(requestId);
-      reject(new Error('The canvas runtime did not respond. Open Layout or Split view and check that this code branch includes the experimentation runtime.'));
-    }, 10000);
-    pending.set(requestId, {
-      resolve, reject, timer,
-    });
-    try {
-      channel.postMessage({
-        type: BRIDGE_MESSAGE, requestId, action, ...details,
-      });
-    } catch (error) {
-      clearTimeout(timer);
-      pending.delete(requestId);
-      reject(error);
-    }
-  });
+  return requestPreviewAction(channel, pending, action, details);
 }
 
 function sendConfig(config) {
-  frame.contentWindow.postMessage({
+  frame?.contentWindow?.postMessage({
     type: 'ue:experimentation-config',
     source: 'da-host',
     config,
   }, MFE_ORIGIN);
 }
 
+function hideFrame() {
+  frame?.remove();
+  frame = undefined;
+}
+
+// A fresh frame per connection: the MFE reads ue-data from the URL hash only at
+// startup, so reassigning src with a new organization would just be a fragment
+// navigation that keeps the previous organization and token.
+function showFrame(url) {
+  hideFrame();
+  const next = document.createElement('iframe');
+  next.id = 'experimentation';
+  next.title = 'Production Contextual Experimentation';
+  next.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads');
+  next.addEventListener('load', () => {
+    if (frame === next && latestConfig) sendConfig(latestConfig);
+  });
+  next.src = url;
+  frame = next;
+  document.body.append(next);
+}
+
 window.addEventListener('message', async (event) => {
-  if (!page || !isMfeMessage(event, frame)) return;
+  if (!page || !frame || !isMfeMessage(event, frame)) return;
   try {
     if (event.data.type === 'ue:request-fresh-config') {
       latestConfig = await requestPreview('config');
@@ -75,10 +83,6 @@ window.addEventListener('message', async (event) => {
   }
 });
 
-frame.addEventListener('load', () => {
-  if (latestConfig) sendConfig(latestConfig);
-});
-
 async function init() {
   if (window.parent === window || !window.location.ancestorOrigins?.length
     || window.location.ancestorOrigins[0] !== 'https://da.live') {
@@ -90,42 +94,31 @@ async function init() {
   ({ actions } = host);
   if (!host.token) throw new Error('Sign in to DA, then reopen this panel.');
   channel = createPreviewChannel(page.pageUrl);
-  channel.onmessage = (event) => {
-    const request = pending.get(event.data?.requestId);
-    if (event.data?.type !== BRIDGE_MESSAGE || !event.data.response || !request) return;
-    pending.delete(event.data.requestId);
-    clearTimeout(request.timer);
-    if (event.data.error) request.reject(new Error(event.data.error));
-    else request.resolve(event.data.result);
-  };
   status.textContent = `Page: ${page.pageUrl}`;
-  button.disabled = false;
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    button.disabled = true;
-    status.hidden = false;
-    status.textContent = 'Connecting to the canvas runtime...';
-    try {
+  await setupExperimentationConnection({
+    form,
+    status,
+    button,
+    changeButton,
+    showFrame,
+    hideFrame,
+    requestConfig: async () => {
       latestConfig = await requestPreview('config');
-      frame.src = getMfeUrl({
-        pageUrl: page.pageUrl,
-        origin: window.location.origin,
-        token: host.token,
-        imsOrg: new FormData(form).get('imsOrg').trim(),
-      });
-      form.hidden = true;
-      status.hidden = true;
-      frame.hidden = false;
-    } catch (error) {
-      showError(error);
-    } finally {
-      button.disabled = false;
-    }
+    },
+    createMfeUrl: (imsOrg) => getMfeUrl({
+      pageUrl: page.pageUrl,
+      origin: window.location.origin,
+      token: host.token,
+      imsOrg,
+      ...getBackendOptions(window.location.search),
+    }),
   });
 }
 
-init().catch(showError);
+init().catch((error) => {
+  form.hidden = false;
+  showError(error);
+});
 
 window.addEventListener('pagehide', () => {
   if (channel) {
@@ -134,10 +127,7 @@ window.addEventListener('pagehide', () => {
     });
     channel.close();
   }
-  pending.forEach(({ timer, reject }) => {
-    clearTimeout(timer);
-    reject(new Error('The panel was closed.'));
-  });
+  pending.forEach((cancel) => cancel());
   pending.clear();
-  frame.removeAttribute('src');
+  hideFrame();
 });
