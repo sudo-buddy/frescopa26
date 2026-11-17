@@ -182,6 +182,13 @@ To test an MFE pull-request build, add
 `ExpSuccess-aem-experimentation-mfe_version=PR-{number}-{commit}` to the plugin
 path, as the Sidekick client does. It can be combined with `env`.
 
+Current Chrome versions block `env=local` inside DA: Local Network Access
+requires every frame to delegate `local-network-access`, and DA's plugin frame
+only allows `clipboard-write`, so the MFE's requests to `localhost` fail with
+`LocalNetworkAccessPermissionDenied`. Test unreleased backends through a
+deployed `backendVersion`, or load the MFE from a top-level local page whose
+iframe sets `allow="local-network-access"`.
+
 The adapter relays actual engine configuration, same-site variant navigation,
 and experiment hover highlighting. DA's currently available host protocol does
 not expose selector-based selection or temporary DOM preview APIs. Those
