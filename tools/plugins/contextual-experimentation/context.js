@@ -99,24 +99,30 @@ export function getEditorHash(href, context) {
 
 const BACKEND_ENVS = ['prod', 'stage', 'dev', 'qa', 'local'];
 const BACKEND_VERSION_PATTERN = /^[a-z0-9][a-z0-9.-]*$/i;
+// Unified Shell selects an MFE build (for example PR-329-<sha>) with this query parameter.
+const MFE_VERSION_PARAM = 'ExpSuccess-aem-experimentation-mfe_version';
+const MFE_VERSION_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/i;
 
 /**
- * Reads the App Builder backend selection from the plugin URL query string,
- * mirroring the UE extension loader (`?env=local&backendVersion=...`).
+ * Reads the App Builder backend and MFE build selection from the plugin URL query string,
+ * mirroring the UE extension loader (`?env=local&backendVersion=...`) and the Sidekick
+ * client (`?ExpSuccess-aem-experimentation-mfe_version=...`).
  * `env=local` makes the production MFE call https://localhost:9080.
  */
 export function getBackendOptions(search = '') {
   const params = new URLSearchParams(search);
   const env = params.get('env');
   const backendVersion = params.get('backendVersion');
+  const mfeVersion = params.get(MFE_VERSION_PARAM);
   return {
     env: BACKEND_ENVS.includes(env) ? env : 'prod',
     ...(BACKEND_VERSION_PATTERN.test(backendVersion ?? '') && { backendVersion }),
+    ...(MFE_VERSION_PATTERN.test(mfeVersion ?? '') && { mfeVersion }),
   };
 }
 
 export function getMfeUrl({
-  pageUrl, origin, token, imsOrg, env = 'prod', backendVersion,
+  pageUrl, origin, token, imsOrg, env = 'prod', backendVersion, mfeVersion,
 }) {
   if (!token || !IMS_ORG_PATTERN.test(imsOrg)) {
     throw new Error('Sign in to DA and supply a valid Adobe IMS organization ID.');
@@ -125,6 +131,7 @@ export function getMfeUrl({
     '/solutions/ExpSuccess-aem-experimentation-mfe/static-assets/resources/ue.html',
     MFE_ORIGIN,
   );
+  if (mfeVersion) url.searchParams.set(MFE_VERSION_PARAM, mfeVersion);
   const data = {
     triggerSource: 'ue',
     env,

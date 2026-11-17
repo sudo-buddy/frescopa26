@@ -178,6 +178,10 @@ in a separate library row. The plugin also accepts `env=stage|qa|dev` and
 `backendVersion`, like the Universal Editor extension loader. Trust the local
 server's certificate by opening `https://localhost:9080/` once in the browser.
 
+To test an MFE pull-request build, add
+`ExpSuccess-aem-experimentation-mfe_version=PR-{number}-{commit}` to the plugin
+path, as the Sidekick client does. It can be combined with `env`.
+
 The adapter relays actual engine configuration, same-site variant navigation,
 and experiment hover highlighting. DA's currently available host protocol does
 not expose selector-based selection or temporary DOM preview APIs. Those

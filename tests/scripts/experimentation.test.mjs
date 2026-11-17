@@ -185,6 +185,24 @@ test('plugin query string selects the App Builder backend for the MFE', () => {
   assert.equal(data.backendVersion, 'pr-77');
 });
 
+test('plugin query string selects a validated MFE build without moving credentials', () => {
+  const build = 'PR-329-ada4bbedde3dff8133c0af7420e92c488ec9fdd1';
+  const param = 'ExpSuccess-aem-experimentation-mfe_version';
+  assert.equal(getBackendOptions(`?${param}=../evil`).mfeVersion, undefined);
+  const options = getBackendOptions(`?env=local&${param}=${build}`);
+  assert.deepEqual(options, { env: 'local', mfeVersion: build });
+  const url = new URL(getMfeUrl({
+    pageUrl: page.pageUrl,
+    origin: page.origin,
+    token: 'test-token-not-a-credential',
+    imsOrg: '123ABC@AdobeOrg',
+    ...options,
+  }));
+  assert.equal(url.searchParams.get(param), build);
+  assert.equal([...url.searchParams.keys()].length, 1);
+  assert.doesNotMatch(url.search, /test-token/);
+});
+
 test('organization input remembers valid submissions and prefills later forms', (t) => {
   const previousWindow = globalThis.window;
   t.after(() => {
