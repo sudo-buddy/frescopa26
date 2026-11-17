@@ -171,6 +171,13 @@ branch deployed to AEM for end-to-end testing, rather than `ref=local`.
 Open `https://da.live/canvas?ref={branch}#/sudo-buddy/frescopa26/index`
 to load both the canvas and the registered plugin from that code branch.
 
+To point the MFE at a local App Builder backend (`aio app dev` on
+`https://localhost:9080`), add `?env=local` to the plugin path, for example
+`/tools/plugins/contextual-experimentation/contextual-experimentation.html?env=local`
+in a separate library row. The plugin also accepts `env=stage|qa|dev` and
+`backendVersion`, like the Universal Editor extension loader. Trust the local
+server's certificate by opening `https://localhost:9080/` once in the browser.
+
 The adapter relays actual engine configuration, same-site variant navigation,
 and experiment hover highlighting. DA's currently available host protocol does
 not expose selector-based selection or temporary DOM preview APIs. Those

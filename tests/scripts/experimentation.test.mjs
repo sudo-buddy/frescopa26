@@ -14,6 +14,7 @@ import {
   MFE_ORIGIN,
   getPageContext,
   getEditorHash,
+  getBackendOptions,
   getMfeUrl,
   isMfeMessage,
   rememberImsOrganization,
@@ -153,6 +154,26 @@ test('MFE credentials travel only in the production iframe fragment', () => {
   assert.equal(data.pageUrl, page.pageUrl);
   assert.equal(data.imsToken, 'test-token-not-a-credential');
   assert.throws(() => getMfeUrl({ token: 'test', imsOrg: 'invalid' }), /organization ID/);
+});
+
+test('plugin query string selects the App Builder backend for the MFE', () => {
+  assert.deepEqual(getBackendOptions(''), { env: 'prod' });
+  assert.deepEqual(getBackendOptions('?env=evil'), { env: 'prod' });
+  assert.deepEqual(getBackendOptions('?env=local&backendVersion=../x'), { env: 'local' });
+  const options = getBackendOptions('?env=local&backendVersion=pr-77');
+  assert.deepEqual(options, { env: 'local', backendVersion: 'pr-77' });
+  const url = new URL(getMfeUrl({
+    pageUrl: page.pageUrl,
+    origin: 'http://localhost:3000',
+    token: 'test-token-not-a-credential',
+    imsOrg: '123ABC@AdobeOrg',
+    ...options,
+  }));
+  assert.equal(url.origin, MFE_ORIGIN);
+  assert.equal(url.search, '');
+  const data = JSON.parse(atob(decodeURIComponent(url.hash.slice('#ue-data='.length))));
+  assert.equal(data.env, 'local');
+  assert.equal(data.backendVersion, 'pr-77');
 });
 
 test('organization input remembers valid submissions and prefills later forms', (t) => {

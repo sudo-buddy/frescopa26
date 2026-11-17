@@ -100,8 +100,26 @@ export function getEditorHash(href, context) {
   return `/${context.org}/${context.site}/${path}`;
 }
 
+const BACKEND_ENVS = ['prod', 'stage', 'dev', 'qa', 'local'];
+const BACKEND_VERSION_PATTERN = /^[a-z0-9][a-z0-9.-]*$/i;
+
+/**
+ * Reads the App Builder backend selection from the plugin URL query string,
+ * mirroring the UE extension loader (`?env=local&backendVersion=...`).
+ * `env=local` makes the production MFE call https://localhost:9080.
+ */
+export function getBackendOptions(search = '') {
+  const params = new URLSearchParams(search);
+  const env = params.get('env');
+  const backendVersion = params.get('backendVersion');
+  return {
+    env: BACKEND_ENVS.includes(env) ? env : 'prod',
+    ...(BACKEND_VERSION_PATTERN.test(backendVersion ?? '') && { backendVersion }),
+  };
+}
+
 export function getMfeUrl({
-  pageUrl, origin, token, imsOrg,
+  pageUrl, origin, token, imsOrg, env = 'prod', backendVersion,
 }) {
   if (!token || !IMS_ORG_PATTERN.test(imsOrg)) {
     throw new Error('Sign in to DA and supply a valid Adobe IMS organization ID.');
@@ -112,7 +130,8 @@ export function getMfeUrl({
   );
   const data = {
     triggerSource: 'ue',
-    env: 'prod',
+    env,
+    ...(backendVersion && { backendVersion }),
     origin,
     pageUrl,
     imsToken: token,

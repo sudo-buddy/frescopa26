@@ -4,6 +4,7 @@ import createPreviewChannel, {
 } from '../../../scripts/experimentation-channel.js';
 import {
   MFE_ORIGIN,
+  getBackendOptions,
   getPageContext,
   getEditorHash,
   getMfeUrl,
@@ -90,6 +91,7 @@ async function init() {
       origin: window.location.origin,
       token: host.token,
       imsOrg,
+      ...getBackendOptions(window.location.search),
     }),
   });
 }
