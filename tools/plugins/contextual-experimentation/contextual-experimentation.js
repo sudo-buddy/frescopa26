@@ -47,9 +47,9 @@ function hideFrame() {
   frame = undefined;
 }
 
-// A fresh script-created frame per connection: browsers restore static iframes
-// to their previous (stale-token) URL on reload, and reassigning an identical
-// URL would only be a fragment navigation that never reloads the MFE.
+// A fresh frame per connection: the MFE reads ue-data from the URL hash only at
+// startup, so reassigning src with a new organization would just be a fragment
+// navigation that keeps the previous organization and token.
 function showFrame(url) {
   hideFrame();
   const next = document.createElement('iframe');

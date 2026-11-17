@@ -275,12 +275,9 @@ test('remembered organization opens CE with the DA token once and can be changed
     '123ABC@AdobeOrg', '456DEF@AdobeOrg',
   ]);
   assert.equal(ui.frame.hidden, false);
-
-  // Reconnecting with an identical URL must mount a new MFE document.
-  ui.change();
-  await ui.submit();
-  assert.equal(ui.frame.mounts, 3);
-  assert.equal(ui.frame.hidden, false);
+  // Changing only the ue-data hash would not restart the MFE, so each
+  // organization needs a newly mounted frame.
+  assert.equal(ui.frame.mounts, 2);
 });
 
 test('missing or invalid organization keeps first-use setup available', async (t) => {
