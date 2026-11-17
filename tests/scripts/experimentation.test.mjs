@@ -30,7 +30,7 @@ function connectionElements(value) {
     querySelector: () => input,
     addEventListener: (name, handler) => formEvents.set(name, handler),
   };
-  const frame = { hidden: true, removeAttribute(name) { delete this[name]; } };
+  const frame = { hidden: true, mounts: 0 };
   const button = { disabled: true };
   const changeButton = {
     hidden: true,
@@ -39,6 +39,15 @@ function connectionElements(value) {
   return {
     form,
     frame,
+    showFrame(url) {
+      frame.mounts += 1;
+      frame.src = url;
+      frame.hidden = false;
+    },
+    hideFrame() {
+      delete frame.src;
+      frame.hidden = true;
+    },
     button,
     changeButton,
     status: {},
@@ -265,6 +274,12 @@ test('remembered organization opens CE with the DA token once and can be changed
   assert.deepEqual(createMfeUrl.mock.calls.map(({ arguments: args }) => args[0]), [
     '123ABC@AdobeOrg', '456DEF@AdobeOrg',
   ]);
+  assert.equal(ui.frame.hidden, false);
+
+  // Reconnecting with an identical URL must mount a new MFE document.
+  ui.change();
+  await ui.submit();
+  assert.equal(ui.frame.mounts, 3);
   assert.equal(ui.frame.hidden, false);
 });
 

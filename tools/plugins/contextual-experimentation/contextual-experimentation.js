@@ -14,7 +14,6 @@ import {
 } from './context.js';
 
 const form = document.querySelector('#connect');
-const frame = document.querySelector('#experimentation');
 const status = document.querySelector('#status');
 const button = form.querySelector('button');
 const changeButton = document.querySelector('#change-organization');
@@ -24,6 +23,7 @@ let page;
 let actions;
 let latestConfig;
 let channel;
+let frame;
 
 function showError(error) {
   status.hidden = false;
@@ -35,15 +35,37 @@ function requestPreview(action, details = {}) {
 }
 
 function sendConfig(config) {
-  frame.contentWindow.postMessage({
+  frame?.contentWindow?.postMessage({
     type: 'ue:experimentation-config',
     source: 'da-host',
     config,
   }, MFE_ORIGIN);
 }
 
+function hideFrame() {
+  frame?.remove();
+  frame = undefined;
+}
+
+// A fresh script-created frame per connection: browsers restore static iframes
+// to their previous (stale-token) URL on reload, and reassigning an identical
+// URL would only be a fragment navigation that never reloads the MFE.
+function showFrame(url) {
+  hideFrame();
+  const next = document.createElement('iframe');
+  next.id = 'experimentation';
+  next.title = 'Production Contextual Experimentation';
+  next.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads');
+  next.addEventListener('load', () => {
+    if (frame === next && latestConfig) sendConfig(latestConfig);
+  });
+  next.src = url;
+  frame = next;
+  document.body.append(next);
+}
+
 window.addEventListener('message', async (event) => {
-  if (!page || !isMfeMessage(event, frame)) return;
+  if (!page || !frame || !isMfeMessage(event, frame)) return;
   try {
     if (event.data.type === 'ue:request-fresh-config') {
       latestConfig = await requestPreview('config');
@@ -61,10 +83,6 @@ window.addEventListener('message', async (event) => {
   }
 });
 
-frame.addEventListener('load', () => {
-  if (!frame.hidden && latestConfig) sendConfig(latestConfig);
-});
-
 async function init() {
   if (window.parent === window || !window.location.ancestorOrigins?.length
     || window.location.ancestorOrigins[0] !== 'https://da.live') {
@@ -79,10 +97,11 @@ async function init() {
   status.textContent = `Page: ${page.pageUrl}`;
   await setupExperimentationConnection({
     form,
-    frame,
     status,
     button,
     changeButton,
+    showFrame,
+    hideFrame,
     requestConfig: async () => {
       latestConfig = await requestPreview('config');
     },
@@ -110,5 +129,5 @@ window.addEventListener('pagehide', () => {
   }
   pending.forEach((cancel) => cancel());
   pending.clear();
-  frame.removeAttribute('src');
+  hideFrame();
 });

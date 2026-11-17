@@ -22,7 +22,7 @@ export function rememberImsOrganization(input) {
 }
 
 export async function setupExperimentationConnection({
-  form, frame, status, button, changeButton, requestConfig, createMfeUrl,
+  form, status, button, changeButton, requestConfig, createMfeUrl, showFrame, hideFrame,
 }) {
   const input = form.querySelector('[name="imsOrg"]');
   let connecting = false;
@@ -35,15 +35,13 @@ export async function setupExperimentationConnection({
     status.textContent = 'Connecting to the canvas runtime...';
     try {
       await requestConfig();
-      frame.src = createMfeUrl(input.value.trim());
+      showFrame(createMfeUrl(input.value.trim()));
       form.hidden = true;
       status.hidden = true;
-      frame.hidden = false;
       changeButton.hidden = false;
     } catch (error) {
       form.hidden = false;
-      frame.hidden = true;
-      frame.removeAttribute('src');
+      hideFrame();
       changeButton.hidden = true;
       status.hidden = false;
       status.textContent = error.message || 'The experimentation connection failed.';
@@ -58,8 +56,7 @@ export async function setupExperimentationConnection({
     await connect();
   });
   changeButton.addEventListener('click', () => {
-    frame.hidden = true;
-    frame.removeAttribute('src');
+    hideFrame();
     form.hidden = false;
     changeButton.hidden = true;
     status.hidden = true;
