@@ -49,6 +49,10 @@ export const DEFAULT_OPTIONS = {
   // Redecoration function for fragments
   decorateFunction: () => {},
 
+  // Optional `(config) => variantName` to pin a visitor to an experiment variant.
+  // Unknown or empty results keep the random allocation.
+  selectVariant: null,
+
   // Which simulation UI to wire up in preview/dev environments:
   // - 'auto' (default): wire up the AEM Sidekick panel if/when the Sidekick is present
   // - 'sidekick': same as 'auto', but explicit
@@ -821,6 +825,15 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
   } else if (overrides.variant && variantNames.includes(overrides.variant)) {
     config.selectedVariant = toClassName(overrides.variant);
   } else {
+    // A project can pin a visitor to a variant (e.g. by browser). Anything that isn't
+    // one of this experiment's variants falls back to the random allocation below.
+    const pinnedVariant = typeof pluginOptions.selectVariant === 'function'
+      ? toClassName(await pluginOptions.selectVariant(config) || '')
+      : '';
+    if (variantNames.includes(pinnedVariant)) {
+      config.selectedVariant = pinnedVariant;
+      return config;
+    }
     // eslint-disable-next-line import/extensions
     const { ued } = await import('./ued.js');
     const decision = ued.evaluateDecisionPolicy(toDecisionPolicy(config), {});
