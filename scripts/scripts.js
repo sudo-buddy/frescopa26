@@ -12,6 +12,7 @@ import {
   buildBlock,
   readBlockConfig,
   toClassName,
+  getMetadata,
 } from './aem.js';
 import {
   COMMERCE_ENABLED,
@@ -363,6 +364,14 @@ const experimentationConfig = {
   decorateFunction: async (element) => {
     decorateMain(element);
     await loadSections(element);
+  },
+  // Pins experiment variants by browser when the page sets `browser-variants` metadata,
+  // e.g. "chrome: challenger-1, safari: challenger-2, default: control".
+  selectVariant: async () => {
+    const browserVariants = getMetadata('browser-variants');
+    if (!browserVariants) return undefined;
+    const { getBrowserVariant } = await import('./browser-variants.js');
+    return getBrowserVariant(browserVariants, navigator.userAgent);
   },
 };
 
